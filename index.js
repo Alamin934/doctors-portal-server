@@ -5,6 +5,9 @@ const admin = require("firebase-admin");
 const cors = require('cors');
 const { MongoClient } = require('mongodb');
 require('dotenv').config();
+const ObjectId = require('mongodb').ObjectId;
+const stripe = require('stripe')(process.env.STRIPE_KEY);
+const fileUpload = require('express-fileupload');
 
 
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -16,6 +19,7 @@ admin.initializeApp({
 //MidleWare
 app.use(cors());
 app.use(express.json());
+app.use(fileUpload());
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.wpmdo.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
@@ -42,6 +46,7 @@ async function run() {
         const database = client.db("doctorsPortal");
         const appointmentsCollection = database.collection("appointment");
         const usersCollection = database.collection("users");
+        const doctorsCollection = database.collection("doctors");
 
 
         //GET ALL API  
@@ -51,6 +56,12 @@ async function run() {
             const query = { email: email, date: date };
             const appointment = await appointmentsCollection.find(query).toArray();
             res.json(appointment);
+        });
+        app.get('/appointment/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const result = await appointmentsCollection.findOne(query);
+            res.json(result);
         })
         //POST API 
         app.post('/appointment', async (req, res) => {
@@ -58,6 +69,37 @@ async function run() {
             const result = await appointmentsCollection.insertOne(appointment)
             // console.log(result);
             res.json(result);
+        });
+
+        app.put('/appointment/:id', async (req, res) => {
+            const id = req.params.id;
+            const payment = req.body;
+            const filter = { _id: ObjectId(id) };
+            const updateDoc = {
+                $set: {
+                    payment: payment
+                }
+            }
+            const result = await appointmentsCollection.updateOne(filter, updateDoc);
+            res.json(result);
+        });
+
+        app.get('/doctors', async (req, res) => {
+            const cursor = doctorsCollection.find({})
+            const doctors = await cursor.toArray();
+            res.json(doctors)
+        })
+        app.post('/doctors', async (req, res) => {
+            const name = req.body.name;
+            const email = req.body.email;
+            const picture = req.files.image;
+            const pictureData = picture.data;
+            const encodedPicture = pictureData.toString('base64');
+            const imageBuffer = Buffer.from(encodedPicture, 'base64');
+            const doctor = { name, email, image: imageBuffer };
+            const result = await doctorsCollection.insertOne(doctor);
+            res.json(result)
+            // console.log(result)
         });
 
         app.get('/users/:email', async (req, res) => {
@@ -104,6 +146,17 @@ async function run() {
             }
 
 
+        });
+
+        app.post('/create-payment-intent', async (req, res) => {
+            const paymentInfo = req.body;
+            const amount = paymentInfo.price * 100;
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'usd',
+                payment_method_types: ['card']
+            });
+            res.json({ clientSecret: paymentIntent.client_secret })
         })
 
 
