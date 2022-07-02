@@ -22,12 +22,12 @@ async function run() {
 
         const database = client.db('doctors_portal');
         const appointmentsCollection = database.collection('appointments');
+        const usersCollection = database.collection('users');
 
         //Appointments GET method
         app.get('/appointments', async (req, res) => {
             const email = req.query.email;
             const date = new Date(req.query.date).toLocaleDateString();
-            console.log(date)
             const query = { email: email, date: date };
             const cursor = appointmentsCollection.find(query);
             const appointments = await cursor.toArray();
@@ -40,6 +40,23 @@ async function run() {
             const result = await appointmentsCollection.insertOne(appointment);
             res.json(result)
         });
+
+        //User POST method
+        app.post('/users', async (req, res) => {
+            const user = req.body;
+            const result = await usersCollection.insertOne(user);
+            res.json(result);
+        });
+
+        //User Update or Replace method
+        app.put('/users', async (req, res) => {
+            const user = req.body;
+            const filter = { email: user.email };
+            const options = { upsert: true };
+            const updateDoc = { $set: user };
+            const result = await usersCollection.updateOne(filter, updateDoc, options);
+            res.json(result);
+        })
 
 
     }
