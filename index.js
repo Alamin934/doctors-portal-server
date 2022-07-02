@@ -48,7 +48,17 @@ async function run() {
             res.json(result);
         });
 
-
+        //Single User GET Method
+        app.get('/users/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            let isAdmin = false;
+            if (user?.role === 'admin') {
+                isAdmin = true
+            }
+            res.json({ admin: isAdmin });
+        });
 
         //User Update or Replace method
         app.put('/users', async (req, res) => {
